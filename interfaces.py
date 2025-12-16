@@ -65,8 +65,10 @@ class Wall(abc.ABC):
 
 class ThemeFactory(abc.ABC):
     @abc.abstractmethod
-    def create_hard_wall(self) -> Wall: pass
+    def create_hard_wall(self) -> Wall: pass   # Kırılmaz (Çerçeve)
     @abc.abstractmethod
-    def create_soft_wall(self) -> Wall: pass
+    def create_soft_wall(self) -> Wall: pass   # Tek vuruşluk
+    @abc.abstractmethod
+    def create_durable_wall(self) -> Wall: pass # Çok vuruşluk 
     @abc.abstractmethod
     def get_background_color(self) -> str: pass

@@ -4,18 +4,18 @@ import random
 import json
 from config import GRID_WIDTH, GRID_HEIGHT
 from database import DatabaseRepository
-from patterns.factories import ForestThemeFactory, CityThemeFactory
+# DesertThemeFactory EKLENDİ
+from patterns.factories import ForestThemeFactory, CityThemeFactory, DesertThemeFactory
 from patterns.strategies import RandomStrategy
 from patterns.decorators import BombPowerUp
 from models.entities import Player, Enemy, Bomb, PowerUpItem
 from network import Network
 
 class GameController:
-    def __init__(self, view, user_data): # <-- user_data eklendi
+    def __init__(self, view, user_data):
         self.view = view
         self.repo = DatabaseRepository()
         
-        # Kullanıcı Bilgileri
         self.user_id = user_data[0]
         self.username = user_data[1]
         self.wins = user_data[2]
@@ -24,12 +24,16 @@ class GameController:
         self.net = Network()
         self.player_id = self.net.player_id
         
-        # Tema Seçimi
-        if random.choice([True, False]):
+        # --- TEMA SEÇİMİ (Artık 3 Seçenek Var) ---
+        theme_choice = random.choice(["Forest", "City", "Desert"])
+        if theme_choice == "Forest":
             self.factory = ForestThemeFactory()
-        else:
+        elif theme_choice == "City":
             self.factory = CityThemeFactory()
+        else:
+            self.factory = DesertThemeFactory()
             
+        print(f"Seçilen Tema: {theme_choice}")
         self.view.set_background(self.factory.get_background_color())
         
         self.grid_walls = [[None for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
@@ -52,20 +56,26 @@ class GameController:
         self.game_loop()
 
     def update_score_ui(self):
-        # Ekranda artık Kullanıcı Adı ve İstatistikler yazsın
         stats_text = f"{self.username} (W:{self.wins}/L:{self.losses})"
         self.view.info_label.config(text=f"{stats_text} | High Score: {self.repo.get_highscore()}")
 
     def _generate_map(self):
-        random.seed(12345)
+        random.seed(12345) # Harita senkronizasyonu için
         for y in range(GRID_HEIGHT):
             for x in range(GRID_WIDTH):
+                # Çerçeve ve Sabit Bloklar
                 if x == 0 or x == GRID_WIDTH-1 or y == 0 or y == GRID_HEIGHT-1:
                     self.grid_walls[y][x] = self.factory.create_hard_wall()
                 elif x % 2 == 0 and y % 2 == 0:
                     self.grid_walls[y][x] = self.factory.create_hard_wall()
-                elif random.random() < 0.3 and not ((x<3 and y<3) or (x>11 and y>9)):
-                    self.grid_walls[y][x] = self.factory.create_soft_wall()
+                
+                # Rastgele Duvarlar
+                elif random.random() < 0.35 and not ((x<3 and y<3) or (x>11 and y>9)):
+                    # %10 ihtimalle SERT DUVAR, %90 ihtimalle NORMAL DUVAR
+                    if random.random() < 0.15:
+                        self.grid_walls[y][x] = self.factory.create_durable_wall()
+                    else:
+                        self.grid_walls[y][x] = self.factory.create_soft_wall()
 
     def handle_input(self, key):
         if not self.player.is_alive: return
@@ -94,13 +104,10 @@ class GameController:
         self.bombs.append(bomb)
 
     def game_over(self, result):
-        """Oyun bittiğinde çağrılır ve veritabanını günceller"""
         if not self.running: return
         self.running = False
-        
         is_win = (result == "WIN")
         self.repo.update_stats(self.username, is_win)
-        
         msg = "KAZANDIN!" if is_win else "KAYBETTİN!"
         color = "green" if is_win else "red"
         self.view.show_game_over(msg, color)
@@ -114,7 +121,6 @@ class GameController:
             reply = self.net.send(my_data)
             if reply:
                 self.opponent.set_pos(reply["x"], reply["y"])
-                # Eğer rakip öldüyse ve bana "alive: False" yolladıysa ben kazanırım
                 if "alive" in reply and not reply["alive"] and self.player.is_alive:
                     self.game_over("WIN")
                     return
@@ -126,10 +132,25 @@ class GameController:
             if explosion_area:
                 bombs_to_remove.append(bomb)
                 self.view.show_explosion(explosion_area)
+                
                 for (ex, ey) in explosion_area:
                     wall = self.grid_walls[ey][ex]
+                    
                     if wall and wall.is_breakable():
-                        self.grid_walls[ey][ex] = None
+                        # --- SERT DUVAR MANTIĞI ---
+                        # Eğer duvarın 'take_damage' özelliği varsa (Sert Duvar ise)
+                        if hasattr(wall, 'take_damage'):
+                            destroyed = wall.take_damage() # Canını azalt
+                            if destroyed:
+                                self.grid_walls[ey][ex] = None
+                                self.repo.save_score(self.repo.get_highscore() + 20)
+                        else:
+                            # Normal duvar ise direkt yok et
+                            self.grid_walls[ey][ex] = None
+                            self.repo.save_score(self.repo.get_highscore() + 10)
+                            if random.random() < 0.3:
+                                self.powerups.append(PowerUpItem(ex, ey))
+                        # -------------------------
                         
         for b in bombs_to_remove: self.bombs.remove(b)
 
@@ -142,7 +163,6 @@ class GameController:
         all_entities = self.enemies + [self.opponent]
         self.view.draw(self.grid_walls, self.player, all_entities, self.bombs, self.powerups)
         
-        # Ölüm Kontrolü
         if self.player.is_alive:
             self.view.root.after(50, self.game_loop)
         else:
