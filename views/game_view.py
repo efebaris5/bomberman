@@ -95,8 +95,8 @@ class GameView:
             self.canvas.create_rectangle(x1, y1, x2, y2, fill="orange", outline="")
         self.root.update()
 
-    def show_game_over(self):
-        self.canvas.create_text(WINDOW_WIDTH/2, WINDOW_HEIGHT/2, text="GAME OVER", fill="red", font=("Arial", 40, "bold"))
+    def show_game_over(self, message="GAME OVER", color="red"):
+        self.canvas.create_text(WINDOW_WIDTH/2, WINDOW_HEIGHT/2, text=message, fill=color, font=("Arial", 40, "bold"))
     
     def set_background(self, color):
         self.canvas.configure(bg=color)

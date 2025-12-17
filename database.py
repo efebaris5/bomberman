@@ -4,7 +4,7 @@ import hashlib
 
 class DatabaseRepository:
     _instance = None 
-    
+
     def update_user_theme(self, username, theme):
         """Kullanıcının temasını günceller."""
         try:
@@ -85,3 +85,12 @@ class DatabaseRepository:
             return result[0] if result[0] is not None else 0
         except:
            return 0
+    
+    def get_leaderboard(self, limit=5):
+        """En çok kazanan ilk 5 oyuncuyu getirir."""
+        try:
+            self.cursor.execute("SELECT username, wins FROM users ORDER BY wins DESC LIMIT ?", (limit,))
+            return self.cursor.fetchall()
+        except Exception as e:
+            print(f"Lider tablosu hatası: {e}")
+            return []

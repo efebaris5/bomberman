@@ -36,6 +36,7 @@ class LoginView:
         # Butonlar
         tk.Button(root, text="GİRİŞ YAP", command=self.login, bg="green", fg="white", width=15).pack(pady=10)
         tk.Button(root, text="KAYIT OL", command=self.register, bg="blue", fg="white", width=15).pack(pady=5)
+        tk.Button(root, text="SKOR TABLOSU", command=self.show_leaderboard, bg="purple", fg="white", width=15).pack(pady=5)
 
     def login(self):
         user = self.entry_user.get()
@@ -73,3 +74,16 @@ class LoginView:
             messagebox.showinfo("Başarılı", f"Kayıt oluşturuldu! Tema: {theme}")
         else:
             messagebox.showerror("Hata", "Bu kullanıcı adı zaten kullanılıyor.")
+           
+    def show_leaderboard(self):
+        top_players = self.repo.get_leaderboard()
+        
+        if not top_players:
+            messagebox.showinfo("Skor Tablosu", "Henüz kayıtlı oyun verisi yok.")
+            return
+            
+        leaderboard_text = "🏆 EN ÇOK KAZANANLAR 🏆\n\n"
+        for i, (user, wins) in enumerate(top_players, 1):
+            leaderboard_text += f"{i}. {user} - {wins} Galibiyet\n"
+            
+        messagebox.showinfo("Skor Tablosu", leaderboard_text)

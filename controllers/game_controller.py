@@ -2,6 +2,7 @@
 import time
 import random
 import json
+from patterns.strategies import RandomStrategy, AStarStrategy
 from config import GRID_WIDTH, GRID_HEIGHT
 from database import DatabaseRepository
 from patterns.factories import ForestThemeFactory, CityThemeFactory, DesertThemeFactory
@@ -54,7 +55,7 @@ class GameController:
             self.player = Player(13, 11)
             self.opponent = Player(1, 1)
 
-        self.enemies = [Enemy(7, 6, RandomStrategy())]
+        self.enemies = [Enemy(11, 9, AStarStrategy())]
         self.bombs = []
         self.running = True
         
