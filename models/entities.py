@@ -8,6 +8,9 @@ class Player(GameObject, Observer, IPlayer):
         self._is_alive = True
         self._bomb_power = 1
         self._max_bombs = 1
+        self._speed = 1 # Varsayılan hız
+
+    def get_speed(self): return self._speed # Yeni metod
     
     def get_bomb_power(self): return self._bomb_power
     def get_max_bombs(self): return self._max_bombs

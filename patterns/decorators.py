@@ -3,7 +3,10 @@ from interfaces import IPlayer, Observer
 class PlayerDecorator(IPlayer, Observer):
     def __init__(self, wrapped_player: IPlayer):
         self._wrapped = wrapped_player
-    
+
+
+    def get_speed(self):
+        return self._wrapped.get_speed()
     @property
     def x(self): return self._wrapped.x
     @property
@@ -42,6 +45,6 @@ class BombCountPowerUp(PlayerDecorator):
 
 # --- YENİ: Hız Artırma (Göstermelik/Bonus) ---
 class SpeedPowerUp(PlayerDecorator):
-    # Bu sınıf şimdilik sadece görseli veya türü değiştirir
-    # İleride hız mantığı eklenirse buraya kod yazılır.
-    pass
+    def get_speed(self):
+        # Hızı 1 artırır (veya 2 katına çıkarır)
+        return self._wrapped.get_speed() + 1

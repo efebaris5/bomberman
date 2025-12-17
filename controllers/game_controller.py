@@ -22,6 +22,7 @@ class GameController:
         self.username = user_data[1]
         self.wins = user_data[2]
         self.losses = user_data[3]
+        self.last_killed_enemies = []
         
         self.net = Network()
         self.player_id = self.net.player_id
@@ -58,6 +59,7 @@ class GameController:
         self.enemies = [Enemy(11, 9, AStarStrategy())]
         self.bombs = []
         self.running = True
+        self.last_action = None
         
         self.view.bind_keys(self.handle_input)
         self.update_score_ui()
@@ -132,6 +134,7 @@ class GameController:
             bomb.add_observer(self.player) 
             bomb.add_observer(self.opponent)
             self.bombs.append(bomb)
+            self.last_action = "BOMB"
         else:
             print("Maksimum bomba sayısına ulaştınız!")
 
@@ -144,58 +147,112 @@ class GameController:
         color = "green" if is_win else "red"
         self.view.show_game_over(msg, color)
 
-    def game_loop(self):
-        if not self.running: return
-        current_time = time.time() * 1000
+    # controllers/game_controller.py -> game_loop metodu
+
+def game_loop(self):
+    if not self.running: return
+    current_time = time.time() * 1000
+    
+    # -------------------------------------------------------------
+    # 1. AĞ SENKRONİZASYONU (Önce veriyi gönder, sonra işlem yap)
+    # -------------------------------------------------------------
+    try:
+        my_data = {
+            "x": self.player.x, 
+            "y": self.player.y, 
+            "alive": self.player.is_alive, # Ölüysek False gidecek
+            "action": self.last_action,    # Bomba koyma bilgisi
+            "killed_enemies": self.last_killed_enemies # [YENİ] Öldürdüğümüz düşmanlar
+        }
         
-        try:
-            my_data = {"x": self.player.x, "y": self.player.y, "alive": self.player.is_alive}
-            reply = self.net.send(my_data)
-            if reply:
-                self.opponent.set_pos(reply["x"], reply["y"])
-                if "alive" in reply and not reply["alive"] and self.player.is_alive:
-                    self.game_over("WIN")
-                    return
-        except: pass
+        reply = self.net.send(my_data)
+        
+        # Gönderilen aksiyonları sıfırla (tekrar tekrar gitmesin)
+        self.last_action = None
+        self.last_killed_enemies = [] 
 
-        bombs_to_remove = []
-        for bomb in self.bombs:
-            explosion_area = bomb.check_explosion(current_time, GRID_WIDTH, GRID_HEIGHT, self.grid_walls)
-            if explosion_area:
-                bombs_to_remove.append(bomb)
-                self.view.show_explosion(explosion_area)
-                
-                for (ex, ey) in explosion_area:
-                    wall = self.grid_walls[ey][ex]
-                    
-                    if wall and wall.is_breakable():
-                        # --- SERT DUVAR MANTIĞI ---
-                        # Eğer duvarın 'take_damage' özelliği varsa (Sert Duvar ise)
-                        if hasattr(wall, 'take_damage'):
-                            destroyed = wall.take_damage() # Canını azalt
-                            if destroyed:
-                                self.grid_walls[ey][ex] = None
-                                self.repo.save_score(self.repo.get_highscore() + 20)
-                        else:
-                            # Normal duvar ise direkt yok et
+        if reply:
+            # Rakibin Konumunu Güncelle
+            self.opponent.set_pos(reply["x"], reply["y"])
+            
+            # [YENİ] Rakip Bomba Koydu mu?
+            if "action" in reply and reply["action"] == "BOMB":
+                # Rakibin bombasını kendi ekranımızda oluşturuyoruz
+                opp_bomb = Bomb(self.opponent.x, self.opponent.y, 1)
+                opp_bomb.add_observer(self.player) # Bu bomba bize zarar verebilir
+                self.bombs.append(opp_bomb)
+            
+            # [YENİ] Rakip Bir Düşmanı Öldürdü mü?
+            if "killed_enemies" in reply:
+                for enemy_idx in reply["killed_enemies"]:
+                    # Eğer indeks geçerliyse ve düşman hala yaşıyorsa öldür
+                    if enemy_idx < len(self.enemies) and self.enemies[enemy_idx].is_alive:
+                        self.enemies[enemy_idx].is_alive = False
+                        # Görsel olarak da güncellemek istersen burada işlem yapabilirsin
+
+            # Kazanma Kontrolü (Rakip ölmüşse kazanırız)
+            if "alive" in reply and not reply["alive"] and self.player.is_alive:
+                self.game_over("WIN")
+                return
+    except Exception as e:
+        print(f"Ağ Hatası: {e}")
+
+    # -------------------------------------------------------------
+    # 2. ÖLÜM KONTROLÜ (Mesaj gönderildikten SONRA kontrol et)
+    # -------------------------------------------------------------
+    # Eğer bu turda ölü olduğumuz bilgisini gönderdiysek, şimdi oyunu bitirebiliriz.
+    # Bu kontrolü 'send' işleminden SONRA yaparak karşı tarafa "öldüm" bilgisinin gitmesini garantiledik.
+    if not self.player.is_alive:
+        self.game_over("LOSE")
+        return
+
+    # -------------------------------------------------------------
+    # 3. OYUN MANTIĞI (Patlamalar ve Düşmanlar)
+    # -------------------------------------------------------------
+    bombs_to_remove = []
+    for bomb in self.bombs:
+        explosion_area = bomb.check_explosion(current_time, GRID_WIDTH, GRID_HEIGHT, self.grid_walls)
+        if explosion_area:
+            bombs_to_remove.append(bomb)
+            self.view.show_explosion(explosion_area)
+            
+            # Patlama alanındaki duvarları ve düşmanları kontrol et
+            for (ex, ey) in explosion_area:
+                # Duvar Kontrolü
+                wall = self.grid_walls[ey][ex]
+                if wall and wall.is_breakable():
+                    if hasattr(wall, 'take_damage'):
+                        if wall.take_damage():
                             self.grid_walls[ey][ex] = None
-                            self.repo.save_score(self.repo.get_highscore() + 10)
-                            if random.random() < 0.3:
-                                self.powerups.append(PowerUpItem(ex, ey))
-                        # -------------------------
-                        
-        for b in bombs_to_remove: self.bombs.remove(b)
+                            self.repo.save_score(self.repo.get_highscore() + 20)
+                    else:
+                        self.grid_walls[ey][ex] = None
+                        self.repo.save_score(self.repo.get_highscore() + 10)
+                        if random.random() < 0.3:
+                            self.powerups.append(PowerUpItem(ex, ey))
+                
+                # [YENİ] Düşman Kontrolü (Patlamada Düşman Ölümü)
+                for idx, enemy in enumerate(self.enemies):
+                    if enemy.is_alive and enemy.x == ex and enemy.y == ey:
+                        enemy.is_alive = False # Düşman öldü
+                        self.last_killed_enemies.append(idx) # [YENİ] Ağa bildirilecek listeye ekle
+                        print("Düşman patlamada öldü!")
 
-        if int(time.time() * 10) % 5 == 0:
-            for enemy in self.enemies:
+    for b in bombs_to_remove: self.bombs.remove(b)
+
+    # Düşman Hareketi
+    if int(time.time() * 10) % 5 == 0:
+        for enemy in self.enemies:
+            if enemy.is_alive: # Sadece yaşayanlar hareket etsin
                 enemy.move((self.player.x, self.player.y), self.grid_walls)
-                if enemy.x == self.player.x and enemy.y == self.player.y and enemy.is_alive:
+                if enemy.x == self.player.x and enemy.y == self.player.y:
                     self.player.kill()
 
-        all_entities = self.enemies + [self.opponent]
-        self.view.draw(self.grid_walls, self.player, all_entities, self.bombs, self.powerups)
-        
-        if self.player.is_alive:
-            self.view.root.after(50, self.game_loop)
-        else:
-            self.game_over("LOSE")
+    # -------------------------------------------------------------
+    # 4. ÇİZİM VE DÖNGÜ
+    # -------------------------------------------------------------
+    all_entities = self.enemies + [self.opponent]
+    self.view.draw(self.grid_walls, self.player, all_entities, self.bombs, self.powerups)
+    
+    # Döngüyü devam ettir (Artık player.is_alive kontrolü yukarıda yapılıyor)
+    self.view.root.after(50, self.game_loop)

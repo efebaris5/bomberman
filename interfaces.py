@@ -52,6 +52,8 @@ class IPlayer(abc.ABC):
     @property
     @abc.abstractmethod
     def is_alive(self): pass
+    @abc.abstractmethod
+    def get_speed(self): pass
 
 # Strategy Pattern Arayüzü
 class MoveStrategy(abc.ABC):

@@ -12,10 +12,17 @@ class MoveCommand(Command):
     def execute(self):
         if not self.player.is_alive: return
 
-        # Hedef koordinatı hesapla
-        nx = self.player.x + self.dx
-        ny = self.player.y + self.dy
+        # Hızı al
+        speed = 1
+        if hasattr(self.player, "get_speed"):
+             speed = self.player.get_speed()
+        
+        # dx ve dy'yi hızla çarp
+        step_x = self.dx * speed
+        step_y = self.dy * speed
 
+        nx = self.player.x + step_x
+        ny = self.player.y + step_y
         # Harita sınırları ve duvar kontrolü
         if 0 <= nx < self.width and 0 <= ny < self.height:
             if self.grid[ny][nx] is None: # Duvar yoksa ilerle
