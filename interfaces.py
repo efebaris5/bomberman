@@ -42,6 +42,8 @@ class IPlayer(abc.ABC):
     @abc.abstractmethod
     def get_bomb_power(self): pass
     @abc.abstractmethod
+    def get_max_bombs(self): pass
+    @abc.abstractmethod
     def get_image_key(self): pass
     @abc.abstractmethod
     def set_pos(self, x, y): pass
@@ -72,3 +74,7 @@ class ThemeFactory(abc.ABC):
     def create_durable_wall(self) -> Wall: pass # Çok vuruşluk 
     @abc.abstractmethod
     def get_background_color(self) -> str: pass
+    # --- Command Pattern Arayüzü ---
+class Command(abc.ABC):
+    @abc.abstractmethod
+    def execute(self): pass

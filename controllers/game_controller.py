@@ -4,12 +4,13 @@ import random
 import json
 from config import GRID_WIDTH, GRID_HEIGHT
 from database import DatabaseRepository
-# DesertThemeFactory EKLENDİ
 from patterns.factories import ForestThemeFactory, CityThemeFactory, DesertThemeFactory
 from patterns.strategies import RandomStrategy
 from patterns.decorators import BombPowerUp
 from models.entities import Player, Enemy, Bomb, PowerUpItem
 from network import Network
+from patterns.commands import MoveCommand, PlaceBombCommand
+from patterns.decorators import BombPowerUp, BombCountPowerUp, SpeedPowerUp
 
 class GameController:
     def __init__(self, view, user_data):
@@ -78,30 +79,54 @@ class GameController:
                         self.grid_walls[y][x] = self.factory.create_soft_wall()
 
     def handle_input(self, key):
-        if not self.player.is_alive: return
-        dx, dy = 0, 0
-        if key == 'Up': dy = -1
-        elif key == 'Down': dy = 1
-        elif key == 'Left': dx = -1
-        elif key == 'Right': dx = 1
-        elif key == 'space': self.place_bomb()
+        command = None
+        
+        # Tuşa göre komut nesnesi oluşturuyoruz (Command Pattern)
+        if key == 'Up':
+            command = MoveCommand(self.player, 0, -1, self.grid_walls, GRID_WIDTH, GRID_HEIGHT)
+        elif key == 'Down':
+            command = MoveCommand(self.player, 0, 1, self.grid_walls, GRID_WIDTH, GRID_HEIGHT)
+        elif key == 'Left':
+            command = MoveCommand(self.player, -1, 0, self.grid_walls, GRID_WIDTH, GRID_HEIGHT)
+        elif key == 'Right':
+            command = MoveCommand(self.player, 1, 0, self.grid_walls, GRID_WIDTH, GRID_HEIGHT)
+        elif key == 'space':
+            command = PlaceBombCommand(self)
 
-        nx, ny = self.player.x + dx, self.player.y + dy
-        if 0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT and self.grid_walls[ny][nx] is None:
-            self.player.set_pos(nx, ny)
-            self.check_powerups()
-
+        # Komutu çalıştır
+        if command:
+            command.execute()
+            self.check_powerups() # Hareket sonrası power-up kontrolü
     def check_powerups(self):
         for p in self.powerups:
             if p.active and p.x == self.player.x and p.y == self.player.y:
                 p.active = False
-                self.player = BombPowerUp(self.player)
+                
+                # Rastgele bir güçlendirme seç
+                choice = random.choice(["power", "count", "speed"])
+                
+                if choice == "power":
+                    self.player = BombPowerUp(self.player)
+                    print("Güçlendirme: Bomba Menzili Arttı!")
+                elif choice == "count":
+                    self.player = BombCountPowerUp(self.player)
+                    print("Güçlendirme: Bomba Hakkı Arttı!")
+                elif choice == "speed":
+                    self.player = SpeedPowerUp(self.player)
+                    print("Güçlendirme: Hız Arttı (Sembolik)!")
                 
     def place_bomb(self):
-        bomb = Bomb(self.player.x, self.player.y, self.player.get_bomb_power())
-        bomb.add_observer(self.player) 
-        bomb.add_observer(self.opponent)
-        self.bombs.append(bomb)
+        # Oyuncunun aktif bombalarını say (PlayerId kontrolü gerekebilir ama şimdilik basit tutuyoruz)
+        # Basit mantık: Ekranda oyuncunun oluşturduğu patlamamış bomba sayısı
+        my_active_bombs = [b for b in self.bombs if not b.exploded]
+        
+        if len(my_active_bombs) < self.player.get_max_bombs():
+            bomb = Bomb(self.player.x, self.player.y, self.player.get_bomb_power())
+            bomb.add_observer(self.player) 
+            bomb.add_observer(self.opponent)
+            self.bombs.append(bomb)
+        else:
+            print("Maksimum bomba sayısına ulaştınız!")
 
     def game_over(self, result):
         if not self.running: return

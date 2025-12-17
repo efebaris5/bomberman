@@ -7,8 +7,10 @@ class Player(GameObject, Observer, IPlayer):
         super().__init__(x, y)
         self._is_alive = True
         self._bomb_power = 1
+        self._max_bombs = 1
     
     def get_bomb_power(self): return self._bomb_power
+    def get_max_bombs(self): return self._max_bombs
     def get_image_key(self): return "player"
     def kill(self):
         self._is_alive = False
