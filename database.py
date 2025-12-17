@@ -4,6 +4,14 @@ import hashlib
 
 class DatabaseRepository:
     _instance = None 
+    
+    def update_user_theme(self, username, theme):
+        """Kullanıcının temasını günceller."""
+        try:
+            self.cursor.execute("UPDATE users SET theme = ? WHERE username = ?", (theme, username))
+            self.conn.commit()
+        except Exception as e:
+            print(f"Tema güncellenemedi: {e}")
 
     def __new__(cls):
         if cls._instance is None:
@@ -22,7 +30,8 @@ class DatabaseRepository:
                 username TEXT UNIQUE NOT NULL,
                 password TEXT NOT NULL,
                 wins INTEGER DEFAULT 0,
-                losses INTEGER DEFAULT 0
+                losses INTEGER DEFAULT 0,
+                theme TEXT DEFAULT 'Forest'
             )
         ''')
         
@@ -35,11 +44,11 @@ class DatabaseRepository:
         ''')
         self.conn.commit()
 
-    def register_user(self, username, password):
+    def register_user(self, username, password, theme="Forest"):
         """Yeni kullanıcı kaydeder. Başarılıysa True döner."""
         pwd_hash = hashlib.sha256(password.encode()).hexdigest()
         try:
-            self.cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, pwd_hash))
+            self.cursor.execute("INSERT INTO users (username, password, theme) VALUES (?, ?, ?)", (username, pwd_hash, theme))            
             self.conn.commit()
             return True
         except sqlite3.IntegrityError:
@@ -48,7 +57,7 @@ class DatabaseRepository:
     def login_user(self, username, password):
         """Giriş başarılıysa kullanıcı verilerini döner, değilse None."""
         pwd_hash = hashlib.sha256(password.encode()).hexdigest()
-        self.cursor.execute("SELECT id, username, wins, losses FROM users WHERE username=? AND password=?", (username, pwd_hash))
+        self.cursor.execute("SELECT id, username, wins, losses, theme FROM users WHERE username=? AND password=?", (username, pwd_hash))
         return self.cursor.fetchone()
 
     def update_stats(self, username, is_win):
@@ -75,4 +84,4 @@ class DatabaseRepository:
             result = self.cursor.fetchone()
             return result[0] if result[0] is not None else 0
         except:
-            return 0
+           return 0

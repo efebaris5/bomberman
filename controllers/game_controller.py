@@ -25,16 +25,22 @@ class GameController:
         self.net = Network()
         self.player_id = self.net.player_id
         
-        # --- TEMA SEÇİMİ (Artık 3 Seçenek Var) ---
-        theme_choice = random.choice(["Forest", "City", "Desert"])
-        if theme_choice == "Forest":
-            self.factory = ForestThemeFactory()
-        elif theme_choice == "City":
+        
+       # --- TEMA SEÇİMİ (Veritabanından) ---
+        # Login_user artık 5. eleman olarak theme dönüyor (index 4)
+        try:
+            user_theme = user_data[4]
+        except IndexError:
+            user_theme = "Forest" # Eski veritabanı kalıntısı varsa hata almamak için
+
+        if user_theme == "City":
             self.factory = CityThemeFactory()
-        else:
+        elif user_theme == "Desert":
             self.factory = DesertThemeFactory()
+        else:
+            self.factory = ForestThemeFactory() # Varsayılan
             
-        print(f"Seçilen Tema: {theme_choice}")
+        print(f"Kullanıcı Teması Yüklendi: {user_theme}")
         self.view.set_background(self.factory.get_background_color())
         
         self.grid_walls = [[None for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]

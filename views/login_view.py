@@ -1,6 +1,7 @@
 # views/login_view.py
 import tkinter as tk
 from tkinter import messagebox
+from tkinter import ttk
 from database import DatabaseRepository
 
 class LoginView:
@@ -26,6 +27,12 @@ class LoginView:
         self.entry_pass = tk.Entry(root, show="*")
         self.entry_pass.pack(pady=5)
 
+        # Tema Seçimi
+        tk.Label(root, text="Tema Seç (Kayıt İçin):", bg="#2d2d2d", fg="white").pack()
+        self.combo_theme = ttk.Combobox(root, values=["Forest", "City", "Desert"], state="readonly")
+        self.combo_theme.current(0) # Varsayılan Forest
+        self.combo_theme.pack(pady=5)
+
         # Butonlar
         tk.Button(root, text="GİRİŞ YAP", command=self.login, bg="green", fg="white", width=15).pack(pady=10)
         tk.Button(root, text="KAYIT OL", command=self.register, bg="blue", fg="white", width=15).pack(pady=5)
@@ -33,22 +40,36 @@ class LoginView:
     def login(self):
         user = self.entry_user.get()
         pwd = self.entry_pass.get()
+        selected_theme = self.combo_theme.get() # Kutudan seçilen temayı al
+
+        # Önce bilgileri kontrol et (Eski temayla gelir)
         user_data = self.repo.login_user(user, pwd)
         
         if user_data:
-            messagebox.showinfo("Başarılı", f"Hoşgeldin {user}!\nKazanma: {user_data[2]} | Kaybetme: {user_data[3]}")
-            self.on_login_success(user_data) # Ana oyuna geçiş yap
+            # Giriş başarılı! Şimdi seçilen temayı veritabanına kaydet
+            self.repo.update_user_theme(user, selected_theme)
+            
+            # user_data normalde değiştirilemez bir 'tuple'dır.
+            # Onu listeye çevirip 4. indeksteki (tema) veriyi güncelliyoruz.
+            # user_data yapısı: [id, username, wins, losses, theme]
+            user_data_list = list(user_data)
+            user_data_list[4] = selected_theme 
+            
+            messagebox.showinfo("Başarılı", f"Hoşgeldin {user}!\nSeçilen Tema: {selected_theme}")
+            
+            # Güncellenmiş listeyi oyuna gönder
+            self.on_login_success(user_data_list) 
         else:
             messagebox.showerror("Hata", "Kullanıcı adı veya şifre hatalı!")
-
     def register(self):
         user = self.entry_user.get()
         pwd = self.entry_pass.get()
+        theme = self.combo_theme.get()
         if not user or not pwd:
             messagebox.showwarning("Uyarı", "Alanlar boş olamaz!")
             return
             
-        if self.repo.register_user(user, pwd):
-            messagebox.showinfo("Başarılı", "Kayıt oluşturuldu! Şimdi giriş yapabilirsiniz.")
+        if self.repo.register_user(user, pwd, theme):
+            messagebox.showinfo("Başarılı", f"Kayıt oluşturuldu! Tema: {theme}")
         else:
             messagebox.showerror("Hata", "Bu kullanıcı adı zaten kullanılıyor.")
