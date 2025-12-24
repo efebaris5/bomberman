@@ -80,3 +80,7 @@ class ThemeFactory(abc.ABC):
 class Command(abc.ABC):
     @abc.abstractmethod
     def execute(self): pass
+    
+class ISoundPlayer(abc.ABC):
+    @abc.abstractmethod
+    def play_sound(self, sound_name): pass

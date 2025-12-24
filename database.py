@@ -1,17 +1,8 @@
-# database.py
 import sqlite3
 import hashlib
 
 class DatabaseRepository:
     _instance = None 
-
-    def update_user_theme(self, username, theme):
-        """Kullanıcının temasını günceller."""
-        try:
-            self.cursor.execute("UPDATE users SET theme = ? WHERE username = ?", (theme, username))
-            self.conn.commit()
-        except Exception as e:
-            print(f"Tema güncellenemedi: {e}")
 
     def __new__(cls):
         if cls._instance is None:
@@ -35,7 +26,7 @@ class DatabaseRepository:
             )
         ''')
         
-        # Skorlar Tablosu (High Score için)
+        # Skorlar Tablosu (Opsiyonel High Score için)
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS scores (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,29 +36,45 @@ class DatabaseRepository:
         self.conn.commit()
 
     def register_user(self, username, password, theme="Forest"):
-        """Yeni kullanıcı kaydeder. Başarılıysa True döner."""
+        """Yeni kullanıcı kaydeder."""
         pwd_hash = hashlib.sha256(password.encode()).hexdigest()
         try:
             self.cursor.execute("INSERT INTO users (username, password, theme) VALUES (?, ?, ?)", (username, pwd_hash, theme))            
             self.conn.commit()
             return True
         except sqlite3.IntegrityError:
-            return False # Bu kullanıcı adı zaten var
+            return False 
 
     def login_user(self, username, password):
-        """Giriş başarılıysa kullanıcı verilerini döner, değilse None."""
+        """Giriş başarılıysa kullanıcı verilerini döner."""
         pwd_hash = hashlib.sha256(password.encode()).hexdigest()
         self.cursor.execute("SELECT id, username, wins, losses, theme FROM users WHERE username=? AND password=?", (username, pwd_hash))
         return self.cursor.fetchone()
 
+    def update_user_theme(self, username, theme):
+        """Kullanıcının temasını günceller."""
+        try:
+            self.cursor.execute("UPDATE users SET theme = ? WHERE username = ?", (theme, username))
+            self.conn.commit()
+        except Exception as e:
+            print(f"Tema güncellenemedi: {e}")
+
+    # --- EKSİK OLAN FONKSİYON BUYDU ---
+    def get_leaderboard(self, limit=5):
+        """En çok kazanan ilk 5 oyuncuyu getirir."""
+        try:
+            self.cursor.execute("SELECT username, wins FROM users ORDER BY wins DESC LIMIT ?", (limit,))
+            return self.cursor.fetchall()
+        except Exception as e:
+            print(f"Lider tablosu hatası: {e}")
+            return []
+
     def update_stats(self, username, is_win):
-        """Maç sonucuna göre istatistikleri günceller."""
         if is_win:
             self.cursor.execute("UPDATE users SET wins = wins + 1 WHERE username = ?", (username,))
         else:
             self.cursor.execute("UPDATE users SET losses = losses + 1 WHERE username = ?", (username,))
         self.conn.commit()
-        print(f"[DB] {username} için istatistik güncellendi (Kazanma: {is_win})")
 
     def save_score(self, score):
         try:
@@ -85,12 +92,3 @@ class DatabaseRepository:
             return result[0] if result[0] is not None else 0
         except:
            return 0
-    
-    def get_leaderboard(self, limit=5):
-        """En çok kazanan ilk 5 oyuncuyu getirir."""
-        try:
-            self.cursor.execute("SELECT username, wins FROM users ORDER BY wins DESC LIMIT ?", (limit,))
-            return self.cursor.fetchall()
-        except Exception as e:
-            print(f"Lider tablosu hatası: {e}")
-            return []
