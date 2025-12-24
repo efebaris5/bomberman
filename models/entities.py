@@ -1,4 +1,3 @@
-# models/entities.py
 import time
 from interfaces import GameObject, Observer, Subject, IPlayer, MoveStrategy
 
@@ -6,18 +5,34 @@ class Player(GameObject, Observer, IPlayer):
     def __init__(self, x, y):
         super().__init__(x, y)
         self._is_alive = True
+        self.health = 1  
         self._bomb_power = 1
         self._max_bombs = 1
-        self._speed = 1 # Varsayılan hız
+        self._speed = 1 
 
-    def get_speed(self): return self._speed # Yeni metod
+    def get_speed(self): return self._speed
     
     def get_bomb_power(self): return self._bomb_power
     def get_max_bombs(self): return self._max_bombs
     def get_image_key(self): return "player"
+    
     def kill(self):
+        """Oyuncuyu doğrudan öldürür."""
         self._is_alive = False
+        self.health = 0
         print("Oyuncu öldü!")
+
+    # --- EKLENDİ: Testlerin beklediği hasar alma fonksiyonu ---
+    def take_damage(self):
+        """Canı 1 azaltır, 0 olursa öldürür."""
+        if not self._is_alive: return
+        
+        self.health -= 1
+        print(f"Oyuncu hasar aldı! Kalan Can: {self.health}")
+        
+        if self.health <= 0:
+            self.kill()
+
     @property
     def is_alive(self): return self._is_alive
     
@@ -26,9 +41,11 @@ class Player(GameObject, Observer, IPlayer):
         self.y = y
 
     def update(self, event_type, data):
+        """Observer metodu: Patlama olunca tetiklenir."""
         if event_type == "EXPLOSION":
             if (self.x, self.y) in data:
-                self.kill()
+                # --- GÜNCELLENDİ: Direkt kill() yerine hasar alıyor ---
+                self.take_damage() 
 
 class Enemy(GameObject, Observer):
     def __init__(self, x, y, strategy: MoveStrategy):
